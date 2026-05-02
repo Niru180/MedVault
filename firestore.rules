@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Helpers ---
+    
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'onboarded']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && data.email.size() > 0 &&
+             data.role in ['patient', 'doctor'] &&
+             data.onboarded is bool;
+    }
+
+    function isValidRecord(data) {
+      return data.keys().hasAll(['patientId', 'title', 'url']) &&
+             data.patientId is string &&
+             data.title is string && data.title.size() > 0 &&
+             data.url is string && data.url.size() > 0;
+    }
+
+    function isValidReminder(data) {
+      return data.keys().hasAll(['patientId', 'text', 'time', 'completed']) &&
+             data.patientId is string &&
+             data.text is string && data.text.size() > 0 &&
+             data.time is string &&
+             data.completed is bool;
+    }
+
+    // --- Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor');
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'age', 'bloodGroup', 'degree', 'address', 'onboarded', 'sharingActive'])
+      );
+    }
+
+    match /records/{recordId} {
+      allow list: if isSignedIn() && (resource.data.patientId == request.auth.uid || 
+                   (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor' && 
+                    get(/databases/$(database)/documents/users/$(resource.data.patientId)).data.sharingActive == true));
+      
+      allow get: if isSignedIn() && (resource.data.patientId == request.auth.uid || 
+                  (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'doctor' && 
+                   get(/databases/$(database)/documents/users/$(resource.data.patientId)).data.sharingActive == true));
+      
+      allow create: if isSignedIn() && incoming().patientId == request.auth.uid && isValidRecord(incoming());
+      allow update: if isOwner(existing().patientId) && isValidRecord(incoming());
+      allow delete: if isOwner(existing().patientId);
+    }
+
+    match /reminders/{reminderId} {
+      allow read, write: if isOwner(incoming().patientId || existing().patientId);
+      // More specific writes:
+      allow create: if isOwner(incoming().patientId) && isValidReminder(incoming());
+      allow update: if isOwner(existing().patientId) && isValidReminder(incoming());
+      allow delete: if isOwner(existing().patientId);
+    }
+  }
+}

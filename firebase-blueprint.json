@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data for both patients and doctors",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["patient", "doctor"] },
+        "age": { "type": "string" },
+        "bloodGroup": { "type": "string" },
+        "degree": { "type": "string" },
+        "address": { "type": "string" },
+        "onboarded": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "onboarded"]
+    },
+    "MedicalRecord": {
+      "title": "Medical Record",
+      "description": "Uploaded patient medical documents",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "category": { "type": "string" },
+        "url": { "type": "string" },
+        "notes": { "type": "string" },
+        "doctorId": { "type": "string" },
+        "doctorName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientId", "title", "url"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Daily health reminders for patients",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "text": { "type": "string" },
+        "time": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["patientId", "text", "time", "completed"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Main user collection"
+    },
+    "/records/{recordId}": {
+      "schema": "MedicalRecord",
+      "description": "Collection of all medical records"
+    },
+    "/reminders/{reminderId}": {
+      "schema": "Reminder",
+      "description": "Collection of patient health reminders"
+    }
+  }
+}
